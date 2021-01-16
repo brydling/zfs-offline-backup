@@ -1,20 +1,28 @@
 {
-    "pool-to-backup":"tank",
-    
-    "backup-disks":[
-        {"zpool": "backup1", "id": "ata-WDC_WD30EFRX-xxxxxx-part1", "luks": "luks-ata-WDC_WD30EFRX-xxxxxx-part1", "luks-keyfile": "/path-to-keys/ata-WDC_WD30EFRX-xxxxxx-part1.key"},
-        {"zpool": "backup2", "id": "ata-WDC_WD30EFRX-yyyyyy-part1", "luks": "luks-ata-WDC_WD30EFRX-yyyyyy-part1", "luks-keyfile": "/path-to-keys/ata-WDC_WD30EFRX-yyyyyy-part1.key"}
-    ],
-    
-    "approve-method":"mail",
-    "approve-method-mail-settings":{
-        "imap-server":"imap.gmail.com",
-        "imap-port":993,
-        "imap-account":"EMAIL",
-        "imap-password":"PASSWORD",
-        "recipient":"RECIPIENT_EMAIL",
-        "sender-name":"Morpheus",
-        "subject":"Requesting backup",
-        "timeout":86000
-    }
+   "pool-to-backup": "tank",
+   "backup-disks": [
+      {
+         "zpool": "backup1",
+         "id": "ata-WDC_WD30EFRX-xxxxxx-part1",
+         "luks": "luks-ata-WDC_WD30EFRX-xxxxxx-part1",
+         "luks-keyfile": "/path-to-keys/ata-WDC_WD30EFRX-xxxxxx-part1.key"
+      },
+      {
+         "zpool": "backup2",
+         "id": "ata-WDC_WD30EFRX-yyyyyy-part1",
+         "luks": "luks-ata-WDC_WD30EFRX-yyyyyy-part1",
+         "luks-keyfile": "/path-to-keys/ata-WDC_WD30EFRX-yyyyyy-part1.key"
+      }
+   ],
+   "approve-method": "mail",
+   "approve-method-mail-settings": {
+      "imap-server": "imap.gmail.com",
+      "imap-port": 993,
+      "imap-account": "EMAIL",
+      "imap-password": "PASSWORD",
+      "recipient": "RECIPIENT_EMAIL",
+      "sender-name": "Morpheus",
+      "subject": "Requesting backup",
+      "timeout": 86000
+   }
 }
