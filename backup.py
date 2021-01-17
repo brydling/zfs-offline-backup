@@ -144,50 +144,9 @@ if __name__ == "__main__":
                         common.export_pool_and_close_luks(disk, 1)
                         
                 if "destroy" in operations:
-                    # get approval
-                    inp = input("Do you REALLY want to destroy all these pools, remove them from config and delete snapshots? Type uppercase 'yes': ")
-                    
-                    if inp == "YES":
-                        print("Destroying")
-                        destroy_approve = True # used in 'remove'
-                        destroyed_disks = destroy_functions.destroy_pools(present_and_selected_disks)
-                        failed_destroyed_disks = [disk for disk in present_and_selected_disks if disk not in destroyed_disks]
-                    else:
-                        print("Skipping")
-                        destroy_approve = False # used in 'remove'
-                        
-                if "remove" in operations or 'destroy_approve' in locals() and destroy_approve == True:
-                    if 'destroy_approve' in locals():
-                        remove = destroy_approve
-                    else:
-                        # get approval
-                        inp = input("Do you REALLY want to remove all these pools from config and delete snapshots? Type uppercase 'yes': ")
-                        
-                        if inp == "YES":
-                            remove = True
-                        else:
-                            remove = False
-                        
-                    if remove:
-                        print("Removing")
-                        
-                        if 'failed_destroyed_disks' in locals():
-                            print("  The following disk(s) failed to destroy: ", end="")
-                            for disk in failed_destroyed_disks:
-                                print(disk["zpool"], end="")
-                            print()
-                            
-                            inp = input("Remove them anyway? Type uppercase 'yes': ")
-                            if inp == "YES":
-                                disks_to_remove = present_and_selected_disks
-                            else:
-                                disks_to_remove = [disk for disk in present_and_selected_disks if disk not in failed_destroyed_disks]
-                        else:
-                            disks_to_remove = present_and_selected_disks
-                            
-                        destroy_functions.remove_pools(disks_to_remove)
-                    else:
-                        print("Skipping")
+                    destroy_functions.destroy_operation(present_and_selected_disks)
+                elif "remove" in operations: # don't check for "remove" if we find "destroy". destroy performs remove as well
+                    destroy_functions.remove_operation(present_and_selected_disks)
                 
                 if "backup" in operations:
                     error_disks = backup_functions.backup_disks(pool_to_backup, present_and_selected_disks, True if "scrub" in operations else False, approve_function)
