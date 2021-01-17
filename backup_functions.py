@@ -120,7 +120,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function, settings):
                 traceback.print_exc()
         
         # delete old snapshot and check pool health if backup succeeded
-        if backup_made:
+        if backup_made and latest_snapshot_this_disk != None:
             print("  Deleting old snapshot: " + latest_snapshot_this_disk)
             delete_snapshot(pool_to_backup, latest_snapshot_this_disk)
             
