@@ -3,6 +3,48 @@ import backup_functions
 import common
 import partitioning
 
+def destroy_operation(disks):
+    inp = input("Do you REALLY want to destroy all these pools, remove them from config and delete snapshots? Type uppercase 'yes': ")
+    
+    if inp == "YES":
+        print("Destroying")
+        destroyed_disks = destroy_pools(disks)
+        failed_destroyed_disks = [disk for disk in disks if disk not in destroyed_disks]
+        
+        if len(failed_destroyed_disks) > 0:
+            print("  The following disk(s) failed to destroy: ", end="")
+            for disk in failed_destroyed_disks:
+                print(disk["zpool"], end="")
+            print()
+            
+            inp = input("Remove them anyway? Type uppercase 'yes': ")
+            if inp == "YES":
+                disks_to_remove = disks
+            else:
+                disks_to_remove = [disk for disk in present_and_selected_disks if disk not in failed_destroyed_disks]
+        else:
+            disks_to_remove = disks
+        
+        if len(disks_to_remove) > 0:
+            print("Removing")
+            remove_pools(disks_to_remove)
+        else:
+            print("Skipping")
+    else:
+        print("Skipping")
+
+def remove_operation(disks):
+    inp = input("Do you REALLY want to remove all these pools from config and delete snapshots? Type uppercase 'yes': ")
+    
+    if inp == "YES":
+        print("Removing")
+        remove_pools(disks)
+    else:
+        print("Skipping")
+        
+    if remove:
+        print("Removing")
+
 def remove_pools(disks):
     settings = common.get_settings()
     pool_to_backup = settings['pool-to-backup']
