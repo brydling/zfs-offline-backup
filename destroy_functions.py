@@ -1,7 +1,7 @@
 import luks
 import backup_functions
 import common
-import partitioning
+import disks
 
 def destroy_operation(disks):
     inp = input("Do you REALLY want to destroy all these pools, remove them from config and delete snapshots? Type uppercase 'yes': ")
