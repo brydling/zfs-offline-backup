@@ -13,7 +13,8 @@ import pool
 
 date_regex = '([0-9]{4}-[0-9]{2}-[0-9]{2})(_([0-9]+))?'
 
-def backup_disks(pool_to_backup, disks, scrub, approve_function, settings):
+def backup_disks(pool_to_backup, disks, scrub, approve_function):
+    settings = common.get_settings()
     error_disks = list()
     for disk in disks:
         delete_created_snapshot = False
@@ -38,7 +39,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function, settings):
                 print(latest_snapshot_this_disk)
             else:
                 print("none found")
-            
+                
             # export pool again. it may take hours to get approval
             common.export_pool_and_close_luks(disk, 1)
             
@@ -52,7 +53,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function, settings):
             # create diff between new snapshot and last approved
             # request approval if there are differences
             # if no differences or approval received, continue
-            ok_to_continue = check_for_diff_and_get_approval(pool_to_backup, disk, latest_approved_snapshot, created_snapshot, approve_function, settings)
+            ok_to_continue = check_for_diff_and_get_approval(pool_to_backup, disk, latest_approved_snapshot, created_snapshot, approve_function)
             
             if not ok_to_continue:
                 print("  Omitting backup")
@@ -119,10 +120,13 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function, settings):
                 print("  Could not export and close disk")
                 traceback.print_exc()
         
-        # delete old snapshot and check pool health if backup succeeded
+        # delete old snapshots
         if backup_made and latest_snapshot_this_disk != None:
-            print("  Deleting old snapshot: " + latest_snapshot_this_disk)
-            delete_snapshot(pool_to_backup, latest_snapshot_this_disk)
+            all_snapshots_this_disk = find_all_snapshots(pool_to_backup, disk["zpool"])
+            for snapshot in all_snapshots_this_disk:
+                if snapshot != created_snapshot:
+                    print("  Deleting old snapshot: " + snapshot)
+                    delete_snapshot(pool_to_backup, snapshot)
             
         # delete temporary snapshot, only if it has not been approved and renamed
         if delete_created_snapshot:
@@ -174,15 +178,22 @@ def delete_snapshot(pool, snapshot):
     
     if cpinst.returncode != 0:
         raise Exception("Error in \"" + cmd + "\":" + cpinst.stderr.decode("utf-8"))
-    
-def find_latest_snapshot(pool, backup_pools):
+
+# returns a list sorted by creationtime (latest snapshot last)
+def find_all_snapshots(pool, backup_pools):
     # if only a single disk dict passed, make a list of it
     if type(backup_pools) == str:
         new_list = list()
         new_list.append(backup_pools)
         backup_pools = new_list
 
-    cmd = "zfs list -H -r -d 1 -t snapshot -o name " + pool
+    # -H: without headers and with single tab between columns
+    # -r: recursive
+    # -d 1: depth 1 (only specified dataset)
+    # -t snapshot: only list snapshots
+    # -o name: only list name
+    # -s creation: sort by creation time
+    cmd = "zfs list -H -r -d 1 -t snapshot -o name -s creation " + pool
     cpinst = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     if cpinst.returncode != 0:
@@ -200,11 +211,12 @@ def find_latest_snapshot(pool, backup_pools):
         for backup_pool in backup_pools:
             if re.fullmatch(backup_pool + '_' + date_regex, words[1]) != None:
                 snapshots.append(words[1])
+                
+    return snapshots
+
+def find_latest_snapshot(pool, backup_pools):
+    snapshots = find_all_snapshots(pool, backup_pools) # returns a list already sorted by creationtime
     
-    # The lambda makes a tuple containing (date(datetime), number(int)), or (date, 0) if the number is missing in the string
-    snapshots.sort(key=lambda datestr: ( datetime.datetime.strptime(re.search(date_regex, datestr)[1],"%Y-%m-%d"),
-                                         int(re.search(date_regex, datestr)[3]) if re.search(date_regex, datestr)[3] != None else 0)
-                  )
     if len(snapshots) > 0:
         return snapshots[-1]
     else:
@@ -311,7 +323,7 @@ def create_diff_text(diff_dict):
         
     return diff_text
 
-def approve_by_console(diff_dict, settings):
+def approve_by_console(diff_dict):
     # present diff
     userinput = input("    Specify a viewer to use or leave empty to print to console: ")
     userinput = userinput.strip()
@@ -357,8 +369,9 @@ def get_email_text(msg):
     else:
         return msg.get_payload()
         
-def approve_by_mail_single(diff_dict, settings):
+def approve_by_mail_single(diff_dict):
     # present diff
+    settings = common.get_settings()
     approve_settings = settings["approve-method-mail-settings"]
     
     sender = approve_settings["sender-name"]
@@ -451,7 +464,7 @@ The changes:\n\n"""
 
 approve_methods = {"console": approve_by_console, "mail": approve_by_mail_single}
 
-def check_for_diff_and_get_approval(pool_to_backup, backup_disk, prev_snapshot, new_snapshot, approve_function, settings):
+def check_for_diff_and_get_approval(pool_to_backup, backup_disk, prev_snapshot, new_snapshot, approve_function):
     print("  Checking for diff from the last approved snapshot")
     diff_dict = create_diff(pool_to_backup, prev_snapshot, new_snapshot)
     
@@ -460,7 +473,7 @@ def check_for_diff_and_get_approval(pool_to_backup, backup_disk, prev_snapshot, 
     if len(diff_dict) > 0:
         print("  Diff found. Continuing to get approval")
             
-        ok_to_cont = approve_function(diff_dict, settings)
+        ok_to_cont = approve_function(diff_dict)
     else:
         print("    No diff")
         ok_to_cont = True

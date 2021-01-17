@@ -56,13 +56,15 @@ def check_scrub(poolname):
         else:
             completed = True
             error = True
-            errormsg = "Error checking scrub status, this is the output from '" + cmd + "':\n" + stdout
+            errormsg = "Error in scrub status, this is the output from '" + cmd + "':\n" + stdout
         
-        healthy, msg = pool_is_healthy(poolname)
+        if completed:
+            healthy, msg = pool_is_healthy(poolname)
         
-        if not healthy:
-            raise Exception(msg)
-        
+            if not healthy:
+                errormsg += "Pool is not healthy:\n" + msg
+                error = True
+                
     except Exception as e:
         errormsg = str(e)
         error = True
