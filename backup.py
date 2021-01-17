@@ -17,25 +17,17 @@ import scrub_functions
 import destroy_functions
 import initialize_functions
 
-# Obs att det senaste snapshotet för en viss backup-pool på pool_to_backup, typ
-# backup1_2020-12-13_1, inte nödvändigtvis är det som finns på backup-poolen. Om
-# approve har gjorts men backup misslyckas så sparas snapshotet ändå på
-# pool_to_backup som det senast godkända för att man ska slippa godkänna samma
-# diff igen senare. För att hitta det senaste snapshotet som faktiskt finns på
-# en viss backup-pool så måste man alltid gå till backup-poolen och kolla.
+# ATTENTION:
+# The latest snapshot on pool_to_backup for a given backup-pool, for example
+# backup1_2020-12-13_1, is not necessarily the one that is on the backup-pool.
+# If it has been approved but the backup failed the snapshot is saved on
+# pool_to_backup as the latest approved to avoid having to approve the same diff
+# again later. To find the latest snapshot that is actually on a given backup-
+# pool one always has to check the snapshots on the backup-pool itself.
 
-# TODO: Lägg till en städfunktion som tar bort alla gamla snapshots för aktuell
-# disk. Kan ju kanske vara samma som den som tar bort det gamla snapshotet nu?
-# Men den ska alltid köras, även om ingen ny backup gjordes. Kanske uppdatera
-# latest_snapshot_this_disk efter att en backup har gjorts, och därefter leta
-# upp och rensa alla snapshots äldre än det?
+# TODO: Add signal handler to clean correctly at Ctrl-C.
 
-# TODO: Kolla om det går att ändra mountpoint på backup-dataseten! Annars, om
-# backup-poolen inte är exporterad innan burken stängs av, så kommer dataseten
-# att automonteras när burken startar. Då blir backup monterad istället för tank.
-# Eller stänga av automount för backup-poolerna.
-
-# TODO: Fixa signalhanterare så att saker städas korrekt vid t ex Ctrl-C.
+# TODO: Add S.M.A.R.T. test as part of scrub
 
 approve_function = None
 
