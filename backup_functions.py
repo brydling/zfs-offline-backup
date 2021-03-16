@@ -360,14 +360,23 @@ def approve_by_console(diff_dict):
         return False
 
 def get_email_text(msg):
+    plaintext_part = None
+    
     if msg.is_multipart():
         for part in msg.walk():
             # each part is a either non-multipart, or another multipart message
             # that contains further parts... Message is organized like a tree
             if part.get_content_type() == 'text/plain':
-                return part.get_payload() # return the raw text
+                plaintext_part =  part
+                break
     else:
-        return msg.get_payload()
+        plaintext_part = msg
+
+    if plaintext_part != None:
+        charset = plaintext_part.get_content_charset()
+        return plaintext_part.get_payload(decode=True).decode(charset)
+    else:
+        raise Exception("Could not find 'text/plain' payload in e-mail")
         
 def approve_by_mail_single(diff_dict):
     # present diff

@@ -29,6 +29,9 @@ import initialize_functions
 
 # TODO: Add S.M.A.R.T. test as part of scrub
 
+# TODO: Implement create_added_removed_renamed_datasets_diff by saving a list
+#       of the datasets from last approved time
+
 approve_function = None
 
 if __name__ == "__main__":
