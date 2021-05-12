@@ -23,11 +23,7 @@ def scrub_disks(disks):
     
     # wait for scrub to complete and export/encrypt when finished
     print("Waiting for scrub(s) to complete")
-    first = True
     while len(scrubbing_disks) > 0:
-        if first:
-            time.sleep(60)
-            first = False
             
         for disk in scrubbing_disks:
             completed,error,errormsg = pool.check_scrub(disk["zpool"])
@@ -41,5 +37,7 @@ def scrub_disks(disks):
                 print("  Scrub succeeded for " + disk["zpool"])
                 scrubbing_disks.remove(disk)
                 common.export_pool_and_close_luks(disk, 2)
+                
+        time.sleep(60)
 
     return error_disks

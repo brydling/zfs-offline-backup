@@ -57,6 +57,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
             
             if not ok_to_continue:
                 print("  Omitting backup")
+                error_disks.append(disk)
             else:
                 print("  Continuing")
                 
@@ -405,68 +406,76 @@ The changes:\n\n"""
         raise Exception("Error in \"" + cmd + "\":" + cpinst.stderr)
     
     print("    Diff mail(s) sent.")
-        
-    # get approval
-    approved = False
-    print("    Logging in to mail server to wait for replies...", end="", flush=True)
-    server = imaplib.IMAP4_SSL(approve_settings["imap-server"], port=approve_settings["imap-port"])
-    rv, data = server.login(approve_settings["imap-account"], approve_settings["imap-password"])
-    print("done")
+
+    approval_received = False # did we receive an approval mail (with a "yes" or a "no")?
+    approved = False # did we receive an approval mail saying "yes"?
     
-    rv, data = server.select()
-    if rv == 'OK':
-        print("    Waiting for approval(s). Timeout is " + str(approve_settings["timeout"]) + " seconds.")
-        approval_received = False
-        start_time = time.time()
-        while not approval_received and time.time() < start_time + approve_settings["timeout"]:
-            server.recent()
-            rv, data = server.search(None, "(SUBJECT " + randomstring + ")")
-            if rv != 'OK':
-                print("    Could not search mails!")
-                return
-
-            for num in data[0].split():
-                rv, data = server.fetch(num, '(RFC822)')
-                if rv != 'OK':
-                    print("    ERROR fetching mail", num)
-                    return
-
-                msg = email.message_from_bytes(data[0][1])
-                print("    Reply from " + str(msg['From']) + ": ", end="", flush=True)
-                the_reply = get_email_text(msg)
-                for line in the_reply.splitlines():
-                    strippedline = line.strip()
-                    if strippedline != '':
-                        if strippedline.lower() == "yes":
-                            print("Approved!")
-                            approval_received = True
-                            approved = True
-                        elif strippedline.lower() == "no":
-                            print("Declined!")
-                            approval_received = True
-                            approved = False
-                        else:
-                            print("Invalid response:\n")
-                            for line in the_reply.splitlines():
-                                print("    " + line)
-                            print("\n    Still waiting.")
-                        
-                        # we have found the first line that wasn't whitespace, don't process the rest
-                        break
-                        
-                # delete the mail
-                server.store(num, '+FLAGS', '\\Deleted')
-            
-            if not approval_received:
-                time.sleep(10)
+    start_time = time.time()
+    
+    while not approval_received and time.time() < start_time + approve_settings["timeout"]:
+        # get approval
+        print("    Logging in to mail server to wait for replies...", end="", flush=True)
+        server = imaplib.IMAP4_SSL(approve_settings["imap-server"], port=approve_settings["imap-port"])
+        rv, data = server.login(approve_settings["imap-account"], approve_settings["imap-password"])
+        print("done")
         
-        if not approval_received:
-            print("    Timeout")
-            
-        server.close()
-    else:
-        print("    ERROR: Unable to open mailbox ", rv)
+        rv, data = server.select()
+        if rv == 'OK':
+            print("    Waiting for approval(s). Timeout is " + str(approve_settings["timeout"]) + " seconds.")
 
+            try:
+                while not approval_received and time.time() < start_time + approve_settings["timeout"]:
+                    server.recent()
+                    rv, data = server.search(None, "(SUBJECT " + randomstring + ")")
+                    if rv != 'OK':
+                        print("    Could not search mails!")
+                        return
+
+                    for num in data[0].split():
+                        rv, data = server.fetch(num, '(RFC822)')
+                        if rv != 'OK':
+                            print("    ERROR fetching mail", num)
+                            return
+
+                        msg = email.message_from_bytes(data[0][1])
+                        print("    Reply from " + str(msg['From']) + ": ", end="", flush=True)
+                        the_reply = get_email_text(msg)
+                        for line in the_reply.splitlines():
+                            strippedline = line.strip()
+                            if strippedline != '':
+                                if strippedline.lower() == "yes":
+                                    print("Approved!")
+                                    approval_received = True
+                                    approved = True
+                                elif strippedline.lower() == "no":
+                                    print("Declined!")
+                                    approval_received = True
+                                    approved = False
+                                else:
+                                    print("Invalid response:\n")
+                                    for line in the_reply.splitlines():
+                                        print("    " + line)
+                                    print("\n    Still waiting.")
+                                
+                                # we have found the first line that wasn't whitespace, don't process the rest
+                                break
+                                
+                        # delete the mail
+                        server.store(num, '+FLAGS', '\\Deleted')
+                    
+                    if not approval_received:
+                        time.sleep(10)
+                        
+                if not approval_received:
+                    print("    Timeout")
+                    
+            except imaplib.IMAP4.abort as e:
+                print("    Disconnected.");
+            
+        else:
+            print("    ERROR: Unable to open mailbox ", rv)
+
+    server.close()
     server.logout()
     
     return approved

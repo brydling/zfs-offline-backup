@@ -41,7 +41,7 @@ if __name__ == "__main__":
     scrub_group = parser.add_argument_group("scrub", "options regarding scrub")
     
     parser.add_argument("pool", nargs='*', help="Optionally used by --backup, --scrub, --import and --export. The default is to perform these operations on all backup disks attached.")
-    parser.add_argument(        "-c", "--config-file",          help="Config file (default=backup-config.json).", default="backup-config.json")
+    parser.add_argument(        "-c", "--config-file",          help="Config file (default=backup-config.json).", default=os.path.dirname(os.path.realpath(__file__)) + "/backup-config.json")
     parser.add_argument(        "-p", "--probe",                help="Probe for backup disks.", action="store_true")
     parser.add_argument(        "-i", "--import",               help="Import backup pool(s).", dest="operations", action="append_const", const="import")
     parser.add_argument(        "-e", "--export",               help="Export backup pool(s).", dest="operations", action="append_const", const="export")
@@ -148,10 +148,13 @@ if __name__ == "__main__":
                                     
                 if "scrub" in operations:
                     for disk in error_disks:
-                        print("  Skipping scrub of pool " + disk["zpool"] + " because of previous errors")
-                        
-                    error_disks_scrub = scrub_functions.scrub_disks([disk for disk in present_and_selected_disks if disk not in error_disks])
-                    error_disks.append(error_disks_scrub)
+                        print("  Skipping scrub of pool " + disk["zpool"] + " because backup did not complete")
+                    
+                    scrub_disks = [disk for disk in present_and_selected_disks if disk not in error_disks]
+                    
+                    if len(scrub_disks) > 0:
+                        error_disks_scrub = scrub_functions.scrub_disks(scrub_disks)
+                        error_disks.append(error_disks_scrub)
                     
         except filelock.Timeout as t:
             print("Another instance of this script is currently running backup or scrub. Exiting.")
