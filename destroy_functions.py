@@ -1,5 +1,6 @@
 import luks
 import backup_functions
+import initialize_functions
 import common
 import disks
 
@@ -34,16 +35,16 @@ def destroy_operation(disks):
         print("Skipping")
 
 def remove_operation(disks):
-    inp = input("Do you REALLY want to remove all these pools from config and delete snapshots? Type uppercase 'yes': ")
-    
-    if inp == "YES":
-        print("Removing")
-        remove_pools(disks)
-    else:
-        print("Skipping")
+    if len(disks) > 0:
+        inp = input("Do you REALLY want to remove all these pools from config and delete snapshots? Type uppercase 'yes': ")
         
-    if remove:
-        print("Removing")
+        if inp == "YES":
+            print("Removing")
+            remove_pools(disks)
+        else:
+            print("Skipping")
+    else:
+        print("No disk selected for remove", flush=True)
 
 def remove_pools(disks):
     settings = common.get_settings()
@@ -55,6 +56,8 @@ def remove_pools(disks):
     for disk in disks:
         pool = disk["zpool"]
         print("  Removing '" + pool + "'")
+        
+        initialize_functions.remove_attach_script([disk], 2)
         
         # delete all snapshots
         snapshots = backup_functions.find_all_snapshots(pool_to_backup, pool)

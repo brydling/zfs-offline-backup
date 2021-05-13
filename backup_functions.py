@@ -25,7 +25,9 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
             # Create a snapshot with a temporary name first. A snapshot shall
             # get it's final name only after it has been approved.
             print("  Creating temporary snapshot: ", end="", flush=True)
-            temp_snapshot_name = "TEMP_SNAPSHOT"
+            temp_snapshot_name = "TEMP_SNAPSHOT_" + disk["zpool"]
+            if snapshot_exists(pool_to_backup, temp_snapshot_name):
+                delete_snapshot(pool_to_backup, temp_snapshot_name)
             created_snapshot = create_snapshot(pool_to_backup, temp_snapshot_name)
             print(created_snapshot)
             delete_created_snapshot = True
@@ -56,7 +58,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
             ok_to_continue = check_for_diff_and_get_approval(pool_to_backup, disk, latest_approved_snapshot, created_snapshot, approve_function)
             
             if not ok_to_continue:
-                print("  Omitting backup")
+                print("  Omitting backup", flush=True)
                 error_disks.append(disk)
             else:
                 print("  Continuing")
@@ -70,7 +72,7 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
                 # because it is the new baseline for what has been approved.
                 print("    Renaming snapshot " + created_snapshot + " to: ", end="", flush=True)                            
                 created_snapshot = rename_snapshot(pool_to_backup, created_snapshot, next_snapshot_name)
-                print(created_snapshot)
+                print(created_snapshot, flush=True)
                 delete_created_snapshot = False
                                             
                 common.open_luks_and_import_pool(disk, 2)
@@ -112,13 +114,13 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
         
         except Exception as e:
             traceback.print_exc()
-            print("  Backup aborted for " + disk["zpool"])
+            print("  Backup aborted for " + disk["zpool"], flush=True)
             error_disks.append(disk)
             
             try:
                 common.export_pool_and_close_luks(disk, 1)
             except Exception as e:
-                print("  Could not export and close disk")
+                print("  Could not export and close disk", flush=True)
                 traceback.print_exc()
         
         # delete old snapshots
@@ -126,12 +128,12 @@ def backup_disks(pool_to_backup, disks, scrub, approve_function):
             all_snapshots_this_disk = find_all_snapshots(pool_to_backup, disk["zpool"])
             for snapshot in all_snapshots_this_disk:
                 if snapshot != created_snapshot:
-                    print("  Deleting old snapshot: " + snapshot)
+                    print("  Deleting old snapshot: " + snapshot, flush=True)
                     delete_snapshot(pool_to_backup, snapshot)
             
         # delete temporary snapshot, only if it has not been approved and renamed
         if delete_created_snapshot:
-            print("  Deleting new snapshot: " + created_snapshot)
+            print("  Deleting new snapshot: " + created_snapshot, flush=True)
             delete_snapshot(pool_to_backup, created_snapshot)
 
     return error_disks
@@ -179,6 +181,31 @@ def delete_snapshot(pool, snapshot):
     
     if cpinst.returncode != 0:
         raise Exception("Error in \"" + cmd + "\":" + cpinst.stderr.decode("utf-8"))
+
+# returns a list sorted by creationtime (latest snapshot last)
+def snapshot_exists(pool, snapshot):
+    # -H: without headers and with single tab between columns
+    # -r: recursive
+    # -d 1: depth 1 (only specified dataset)
+    # -t snapshot: only list snapshots
+    # -o name: only list name
+    # -s creation: sort by creation time
+    cmd = "zfs list -H -r -d 1 -t snapshot -o name " + pool
+    cpinst = subprocess.run(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    if cpinst.returncode != 0:
+        raise Exception("Error in \"" + cmd + "\":\n" + cpinst.stderr.decode("utf-8"))
+    
+    stdout = cpinst.stdout.decode("utf-8")
+    
+    snapshots = list()
+    
+    for line in stdout.splitlines():
+        words = line.split('@')
+        if words[1].strip() == snapshot:
+            return True
+                
+    return False
 
 # returns a list sorted by creationtime (latest snapshot last)
 def find_all_snapshots(pool, backup_pools):
@@ -336,7 +363,7 @@ def approve_by_console(diff_dict):
         print(diff_text)
     else:
         diff_file = "BACKUP_TEMP.diff"
-        print("    Creating temporary diff file: " + diff_file)
+        print("    Creating temporary diff file: " + diff_file, flush=True)
 
         with open(diff_file, 'w') as f:
             f.write(diff_text)
@@ -346,7 +373,7 @@ def approve_by_console(diff_dict):
         try:
             cpinst = subprocess.run(cmd.split(), stderr=subprocess.PIPE)
         finally:
-            print("    Removing temporary diff file")
+            print("    Removing temporary diff file", flush=True)
             os.remove(diff_file)
         
         if cpinst.returncode != 0:
@@ -417,24 +444,24 @@ The changes:\n\n"""
         print("    Logging in to mail server to wait for replies...", end="", flush=True)
         server = imaplib.IMAP4_SSL(approve_settings["imap-server"], port=approve_settings["imap-port"])
         rv, data = server.login(approve_settings["imap-account"], approve_settings["imap-password"])
-        print("done")
+        print("done", flush=True)
         
         rv, data = server.select()
         if rv == 'OK':
-            print("    Waiting for approval(s). Timeout is " + str(approve_settings["timeout"]) + " seconds.")
+            print("    Waiting for approval(s). Timeout is " + str(approve_settings["timeout"]) + " seconds.", flush=True)
 
             try:
                 while not approval_received and time.time() < start_time + approve_settings["timeout"]:
                     server.recent()
                     rv, data = server.search(None, "(SUBJECT " + randomstring + ")")
                     if rv != 'OK':
-                        print("    Could not search mails!")
+                        print("    Could not search mails!", flush=True)
                         return
 
                     for num in data[0].split():
                         rv, data = server.fetch(num, '(RFC822)')
                         if rv != 'OK':
-                            print("    ERROR fetching mail", num)
+                            print("    ERROR fetching mail", num, flush=True)
                             return
 
                         msg = email.message_from_bytes(data[0][1])
@@ -444,18 +471,18 @@ The changes:\n\n"""
                             strippedline = line.strip()
                             if strippedline != '':
                                 if strippedline.lower() == "yes":
-                                    print("Approved!")
+                                    print("Approved!", flush=True)
                                     approval_received = True
                                     approved = True
                                 elif strippedline.lower() == "no":
-                                    print("Declined!")
+                                    print("Declined!", flush=True)
                                     approval_received = True
                                     approved = False
                                 else:
-                                    print("Invalid response:\n")
+                                    print("Invalid response:\n", flush=True)
                                     for line in the_reply.splitlines():
                                         print("    " + line)
-                                    print("\n    Still waiting.")
+                                    print("\n    Still waiting.", flush=True)
                                 
                                 # we have found the first line that wasn't whitespace, don't process the rest
                                 break
@@ -467,13 +494,13 @@ The changes:\n\n"""
                         time.sleep(10)
                         
                 if not approval_received:
-                    print("    Timeout")
+                    print("    Timeout", flush=True)
                     
             except imaplib.IMAP4.abort as e:
-                print("    Disconnected.");
+                print("    Disconnected.", flush=True);
             
         else:
-            print("    ERROR: Unable to open mailbox ", rv)
+            print("    ERROR: Unable to open mailbox ", rv, flush=True)
 
     server.close()
     server.logout()
@@ -483,17 +510,17 @@ The changes:\n\n"""
 approve_methods = {"console": approve_by_console, "mail": approve_by_mail_single}
 
 def check_for_diff_and_get_approval(pool_to_backup, backup_disk, prev_snapshot, new_snapshot, approve_function):
-    print("  Checking for diff from the last approved snapshot")
+    print("  Checking for diff from the last approved snapshot", flush=True)
     diff_dict = create_diff(pool_to_backup, prev_snapshot, new_snapshot)
     
     # check if we have any differences
     ok_to_cont = False
     if len(diff_dict) > 0:
-        print("  Diff found. Continuing to get approval")
+        print("  Diff found. Continuing to get approval", flush=True)
             
         ok_to_cont = approve_function(diff_dict)
     else:
-        print("    No diff")
+        print("    No diff", flush=True)
         ok_to_cont = True
     
     return ok_to_cont
